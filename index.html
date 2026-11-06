@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dengue Analytics | Plataforma predictiva</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static',filename='style.css') }}"></head>
+<body>
+<header class="topbar"><a class="brand" href="/"><span class="brand-mark">D</span><span>DENGUE<span class="brand-light">ANALYTICS</span></span></a><span class="top-tag">PROYECTO ACADÉMICO · MACHINE LEARNING</span></header>
+<main class="wrap">
+<section class="hero"><div class="eyebrow"><span class="pulse"></span> PLATAFORMA DE ANALÍTICA PREDICTIVA</div><h1>Explora los datos.<br><em>Compara modelos.</em></h1><p>Modelos de clasificación entrenados con la base de datos pediátrica de dengue suministrada para este proyecto.</p>
+<div class="hero-stats"><div><b>303</b><small>REGISTROS ORIGINALES</small></div><div><b>2</b><small>MODELOS</small></div><div><b>5</b><small>INDICADORES</small></div></div></section>
+<section class="panel"><div class="section-head"><div><span class="eyebrow">01 / PREDICCIÓN</span><h2>Evaluar un registro</h2><p>Ingresa los valores de laboratorio y selecciona el modelo.</p></div><div class="chip">EN LÍNEA</div></div>
+<form id="predict-form">
+<div class="model-select"><label class="model-option selected"><input type="radio" name="model" value="logistic" checked><span class="model-icon">01</span><span><b>Regresión logística</b><small>Modelo estadístico de clasificación binaria</small></span></label><label class="model-option"><input type="radio" name="model" value="neural"><span class="model-icon">02</span><span><b>Red neuronal artificial</b><small>Perceptrón multicapa (MLP)</small></span></label></div>
+<div class="fields">
+<label>PCV (%)<input type="number" name="pcv" step="0.1" min="0" placeholder="Ej. 42" required><small>Indicador derivado: ≥ 42%</small></label>
+<label>Recuento de plaquetas<input type="number" name="platelets" step="1" min="0" placeholder="Ej. 75000" required><small>Indicador derivado: ≤ 75.000 células/cumm</small></label>
+<label>WBC más alto<input type="number" name="wbc" step="1" min="0" placeholder="Ej. 7000" required><small>Indicador derivado: ≥ 7.000 células/cumm</small></label>
+<label>ALT (U/L)<input type="number" name="alt" step="0.1" min="0" placeholder="Ej. 70" required><small>Indicador derivado: ≥ 70 U/L</small></label>
+<label class="full">Código de BP al ingreso<select name="bp_code" required><option value="">Selecciona código</option><option value="1">1</option><option value="2">2</option></select><small>Se conserva el código numérico original del Excel. Verifica su correspondencia con el archivo de codificación del dataset.</small></label>
+</div><button class="submit" type="submit">Ejecutar predicción <span>→</span></button></form>
+<div id="result" class="result hidden" aria-live="polite"></div>
+</section>
+<section class="panel"><div class="section-head"><div><span class="eyebrow">02 / RENDIMIENTO</span><h2>Comparación de modelos</h2><p>Métricas calculadas sobre un conjunto de prueba reservado (20%).</p></div></div>
+<div class="metrics-grid">
+{% for key,label in [('logistic','Regresión logística'),('neural','Red neuronal artificial')] %}
+<div class="metric-card"><h3>{{label}}</h3><div class="metric-list">
+{% for m,title in [('accuracy','Exactitud'),('precision','Precisión'),('recall','Sensibilidad'),('f1','F1-score'),('auc','ROC-AUC')] %}
+<div class="metric"><span>{{title}}</span><b>{{ (metrics[key][m]*100)|round(1) }}%</b><div class="bar"><i style="width:{{metrics[key][m]*100}}%"></i></div></div>
+{% endfor %}</div></div>{% endfor %}
+</div><p class="note">Las métricas corresponden a esta partición reproducible y pueden variar al cambiar la semilla o el conjunto de datos. No equivalen a validación clínica externa.</p></section>
+<section class="panel info"><span class="eyebrow">03 / METODOLOGÍA</span><h2>Preparación de los datos</h2><div class="steps"><div><b>01</b><strong>Depuración</strong><p>Se eliminó una fila duplicada y se verificaron columnas constantes.</p></div><div><b>02</b><strong>Selección</strong><p>Se seleccionaron cinco indicadores destacados en el artículo científico adjunto.</p></div><div><b>03</b><strong>Ingeniería</strong><p>Se transformaron los valores clínicos en variables binarias usando los puntos de corte publicados.</p></div><div><b>04</b><strong>Entrenamiento</strong><p>Imputación, escalado y entrenamiento de regresión logística y MLP.</p></div></div></section>
+<footer><span>DENGUE ANALYTICS</span><span>Herramienta académica · No usar para decisiones médicas</span></footer>
+</main>
+<script>
+const form=document.getElementById('predict-form'), result=document.getElementById('result');
+document.querySelectorAll('.model-option input').forEach(el=>el.addEventListener('change',()=>{document.querySelectorAll('.model-option').forEach(x=>x.classList.remove('selected'));el.closest('.model-option').classList.add('selected')}));
+form.addEventListener('submit',async e=>{e.preventDefault();const btn=form.querySelector('.submit');btn.disabled=true;btn.textContent='Calculando…';result.classList.add('hidden');
+try{const res=await fetch('/predict',{method:'POST',body:new FormData(form)});const data=await res.json();if(!res.ok)throw new Error(data.error||'No fue posible calcular');result.className='result '+(data.prediction===1?'warning':'success');result.innerHTML=`<div class="result-top"><span>RESULTADO · ${data.model}</span><span class="prob">${data.probability}%</span></div><h3>${data.label}</h3><p>Probabilidad estimada por el modelo para la clase complicada.</p><div class="indicators">${Object.entries(data.indicators).map(([k,v])=>`<span class="${v?'active':''}">${v?'✓':'—'} ${k}</span>`).join('')}</div><small>Estimación experimental basada en datos históricos. No constituye diagnóstico ni recomendación clínica.</small>`;}catch(err){result.className='result warning';result.textContent=err.message;}finally{btn.disabled=false;btn.innerHTML='Ejecutar predicción <span>→</span>';}});
+</script></body></html>
